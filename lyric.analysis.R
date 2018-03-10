@@ -165,3 +165,39 @@ prince %>%
 
 ############################################################################################
 ## Text Mining
+#manually remove superfluous words
+undesirable_words <- c("prince", "chorus", "repeat", "lyrics", 
+                       "theres", "bridge", "fe0f", "yeah", "baby", 
+                       "alright", "wanna", "gonna", "chorus", "verse", 
+                       "whoa", "gotta", "make", "miscellaneous", "2", 
+                       "4", "ooh", "uurh", "pheromone", "poompoom", "3121", 
+                       "matic", " ai ", " ca ", " la ", "hey", " na ", 
+                       " da ", " uh ", " tin ", "  ll", "transcription",
+                       "repeats")
+
+#tidytext::unnest_tokens(): tokenize texts
+#tprince_words_filtered is the tidy text version of the prince 
+#data frame without 1) stop words, 2) undesirable words, and 3) 1-3 character words. 
+
+#unnest and remove stop, undesirable and short words
+prince_words_filtered <- prince %>%
+  unnest_tokens(word, lyrics) %>%
+  anti_join(stop_words) %>%
+  distinct() %>%
+  filter(!word %in% undesirable_words) %>%
+  filter(nchar(word) > 3)
+
+# the lyrics column tokenized into word column
+dim(prince_words_filtered)
+
+prince_words_filtered %>% 
+  filter(word == "race") %>%
+  select(word, song, year, peak, decade, chart_level, charted) %>%
+  arrange() %>%
+  top_n(10,song) %>%
+  mutate(song = color_tile("lightblue","lightblue")(song)) %>%
+  mutate(word = color_tile("lightgreen","lightgreen")(word)) %>%
+  kable("html", escape = FALSE, align = "c", caption = "Tokenized Format Example") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                full_width = FALSE)
