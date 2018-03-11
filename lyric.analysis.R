@@ -11,7 +11,13 @@ library(gridExtra) #viewing multiple plots together
 library(tidytext) #text mining
 library(wordcloud2) #creative visualizations
 
-source("./utils.R")
+# Automate setting the working directory directly to that folder from wich the script resides
+set_wd <- function() {
+  library(rstudioapi) # make sure you have it installed
+  current_path <- getActiveDocumentContext()$path 
+  print(current_path)
+  setwd(dirname(current_path ))
+}
 
 # set working directory to the folder current script resides in
 set_wd()
@@ -201,3 +207,141 @@ prince_words_filtered %>%
   kable_styling(bootstrap_options = 
                   c("striped", "condensed", "bordered"), 
                 full_width = FALSE)
+
+#Songs With Highest Word Count, without remove stopwords
+full_word_count <- prince %>%
+  unnest_tokens(word, lyrics) %>%
+  group_by(song,chart_level) %>%
+  summarise(num_words = n()) %>%
+  arrange(desc(num_words)) 
+
+full_word_count[1:10,] %>%
+  ungroup(num_words, song) %>%
+  mutate(num_words = color_bar("lightblue")(num_words)) %>%
+  mutate(song = color_tile("lightpink","lightpink")(song)) %>%
+  kable("html", escape = FALSE, align = "c", caption = "Songs With Highest Word Count") %>%
+  kable_styling(bootstrap_options = 
+                  c("striped", "condensed", "bordered"), 
+                full_width = FALSE)
+
+#Word Count Distribution
+full_word_count %>%
+  ggplot() +
+  geom_histogram(aes(x = num_words, fill = chart_level )) +
+  ylab("Song Count") + 
+  xlab("Word Count per Song") +
+  ggtitle("Word Count Distribution") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        panel.grid.minor.y = element_blank())
+
+### Most Frequently Used Words
+prince_words_filtered %>%
+  count(word, sort = TRUE) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot() +
+  geom_col(aes(word, n), fill = my_colors[4]) +
+  theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank()) +
+  xlab("") + 
+  ylab("Song Count") +
+  ggtitle("Most Frequently Used Words in Prince Lyrics") +
+  coord_flip()
+
+### Word Clouds
+prince_words_counts <- prince_words_filtered %>%
+  count(word, sort = TRUE) 
+
+wordcloud2(prince_words_counts[1:300, ], size = .5)
+
+wordcloud2(prince_words_counts[1:300, ], figPath = "guitar_icon.png", 
+           color = "random-dark", size = 1.5)
+
+letterCloud(prince_words_counts[1:300, ], word = "PRINCE", size = 2)
+
+##Popular words
+popular_words <- prince_words_filtered %>% 
+  group_by(chart_level) %>%
+  count(word, chart_level, sort = TRUE) %>%
+  slice(seq_len(8)) %>%
+  ungroup() %>%
+  arrange(chart_level,n) %>%
+  mutate(row = row_number()) 
+
+popular_words %>%
+  ggplot(aes(row, n, fill = chart_level)) +
+  geom_col(show.legend = NULL) +
+  labs(x = NULL, y = "Song Count") +
+  ggtitle("Popular Words by Chart Level") + 
+  theme_lyrics() +  
+  facet_wrap(~chart_level, scales = "free") +
+  scale_x_continuous(  # This handles replacement of row 
+    breaks = popular_words$row, # notice need to reuse data frame
+    labels = popular_words$word) +
+  coord_flip()
+
+
+###Timeless word
+timeless_words <- prince_words_filtered %>% 
+  filter(decade != 'NA') %>%
+  group_by(decade) %>%
+  count(word, decade, sort = TRUE) %>%
+  slice(seq_len(8)) %>%
+  ungroup() %>%
+  arrange(decade,n) %>%
+  mutate(row = row_number()) 
+
+timeless_words %>%
+  ggplot(aes(row, n, fill = decade)) +
+  geom_col(show.legend = NULL) +
+  labs(x = NULL, y = "Song Count") +
+  ggtitle("Timeless Words") + 
+  theme_lyrics() +  
+  facet_wrap(~decade, scales = "free", ncol = 5) +
+  scale_x_continuous(  # This handles replacement of row 
+    breaks = timeless_words$row, # notice need to reuse data frame
+    labels = timeless_words$word) +
+  coord_flip()
+
+###Word length
+#unnest and remove undesirable words, but leave in stop and short words
+prince_word_lengths <- prince %>%
+  unnest_tokens(word, lyrics) %>%
+  group_by(song,decade) %>%
+  distinct() %>%
+  filter(!word %in% undesirable_words) %>%
+  mutate(word_length = nchar(word)) 
+
+prince_word_lengths %>%
+  count(word_length, sort = TRUE) %>%
+  ggplot(aes(word_length), 
+         binwidth = 10) + 
+  geom_histogram(aes(fill = ..count..),
+                 breaks = seq(1,25, by = 2), 
+                 show.legend = FALSE) + 
+  xlab("Word Length") + 
+  ylab("Word Count") +
+  ggtitle("Word Length Distribution") +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.minor = element_blank())
+
+###What's the long words?
+wc <- prince_word_lengths %>%
+  ungroup() %>%
+  select(word, word_length) %>%
+  distinct() %>%
+  arrange(desc(word_length))
+
+wordcloud2(wc[1:300, ], 
+           size = .15,
+           minSize = .0005,
+           ellipticity = .3, 
+           rotateRatio = 1, 
+           fontWeight = "bold")
+
+
+
+
